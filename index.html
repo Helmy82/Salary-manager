@@ -24,6 +24,7 @@ input,select{width:100%;border:1px solid #dce5e0;border-radius:10px;padding:12px
 .item:last-child{border-bottom:0}.item small{display:block;color:var(--muted);margin-top:4px}
 .hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:20px;font-size:13px}
 .status{font-size:12px;margin-top:9px;line-height:1.7}.ok{color:#176b5b}.err{color:#b94a48}
+.bar-row{display:grid;grid-template-columns:minmax(90px,1fr) 2fr auto;gap:9px;align-items:center;margin:12px 0;font-size:12px}.bar-track{height:12px;background:#edf2ef;border-radius:20px;overflow:hidden}.bar-fill{height:100%;border-radius:20px}.bar-fill.exp{background:#bd625c}.bar-fill.inc{background:#268b70}.chart-legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin:8px 0 14px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:5px}
 footer{text-align:center;color:var(--muted);font-size:11px;padding:22px}
 @media(min-width:650px){.cards{grid-template-columns:repeat(4,1fr)}}
 </style></head>
@@ -46,7 +47,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:22px}
   <div class="card"><small>الرصيد المتبقي</small><div class="amount" id="balanceTotal">0.00 ج.م</div></div>
   <div class="card"><small>المدخرات</small><div class="amount green" id="savingTotal">0.00 ج.م</div></div>
  </section>
- <nav class="tabs"><button class="tab active" data-tab="add">إضافة حركة</button><button class="tab" data-tab="history">سجل الحركات</button><button class="tab" data-tab="budget">الميزانية</button></nav>
+ <nav class="tabs"><button class="tab active" data-tab="add">إضافة حركة</button><button class="tab" data-tab="history">سجل الحركات</button><button class="tab" data-tab="budget">الميزانية</button><button class="tab" data-tab="wishlist">قائمة المشتريات</button><button class="tab" data-tab="charts">الرسوم البيانية</button></nav>
  <section id="add" class="panel"><h2>تسجيل إيراد أو مصروف</h2>
   <div class="grid"><div><label>نوع الحركة</label><select id="type"><option value="expense">مصروف</option><option value="income">إيراد</option><option value="saving">ادخار</option></select></div><div><label>المبلغ بالجنيه</label><input id="amount" type="number" min="0.01" step="0.01" placeholder="مثال: 500"></div></div>
   <div class="grid"><div><label>التصنيف</label><select id="category"></select></div><div><label>التاريخ</label><input id="date" type="date"></div></div>
@@ -55,6 +56,8 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:22px}
  </section>
  <section id="history" class="panel hidden"><div class="row"><h2>سجل الحركات</h2><select id="filter" style="width:auto"><option value="all">الكل</option><option value="income">الإيرادات</option><option value="expense">المصروفات</option><option value="saving">الادخار</option></select></div><div id="transactions"></div></section>
  <section id="budget" class="panel hidden"><h2>ملخص الشهر الحالي</h2><div class="row"><span>الشهر</span><strong id="monthLabel"></strong></div><div class="item"><span>الإيرادات</span><strong class="green" id="mIncome">0</strong></div><div class="item"><span>المصروفات</span><strong class="red" id="mExpense">0</strong></div><div class="item"><span>الادخار</span><strong id="mSaving">0</strong></div><div class="item"><span>الصافي</span><strong id="mNet">0</strong></div></section>
+ <section id="wishlist" class="panel hidden"><h2>قائمة المشتريات / ملاحظات</h2><p style="font-size:12px;color:var(--muted);line-height:1.7">اكتب الأشياء التي تنوي شراءها. هذه القائمة مستقلة تماماً عن الحسابات ولا تخصم أي مبلغ من الرصيد.</p><label>اسم الشيء</label><input id="wishTitle" maxlength="100" placeholder="مثال: فلتر مياه"><label>ملاحظات (اختياري)</label><input id="wishNote" maxlength="180" placeholder="الموديل أو المقاس أو أي تفاصيل"><button class="primary" id="addWish">إضافة إلى القائمة</button><div id="wishMsg" class="status"></div><div id="wishItems"></div></section>
+ <section id="charts" class="panel hidden"><div class="row"><h2>تفصيل الإيرادات والمصروفات</h2><select id="chartPeriod" style="width:auto"><option value="month">الشهر الحالي</option><option value="all">كل الفترات</option></select></div><div class="chart-legend"><span><i class="dot" style="background:#268b70"></i>الإيرادات</span><span><i class="dot" style="background:#bd625c"></i>المصروفات</span></div><h3 style="font-size:14px">الإيرادات حسب التصنيف</h3><div id="incomeChart"></div><h3 style="font-size:14px;margin-top:22px">المصروفات حسب التصنيف</h3><div id="expenseChart"></div><div class="status">الرسوم تُحسب من الحركات المسجلة فقط، وقائمة المشتريات لا تدخل في الحسابات.</div></section>
 </section>
 </main><footer>إدارة مرتبي · المزامنة السحابية</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -63,7 +66,7 @@ const SUPABASE_URL="https://fekonbzcakhbijsiqvla.supabase.co";
 const SUPABASE_KEY="sb_publishable_5yIBPk91aWEX2Wza2uQmyg_9_NbFdwi";
 const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const cats={income:["المرتب","مكافأة","دخل إضافي","أخرى"],expense:["البيت","الأكل ومستلزمات المنزل","المدارس","السيارات والمواصلات","الفواتير","العلاج","الملابس","الترفيه","الصدقة","أقساط والتزامات","أخرى"],saving:["ادخار شهري","طوارئ","هدف خاص"]};
-let tx=[],currentUser=null,channel=null;
+let tx=[],wishes=[],currentUser=null,channel=null;
 const $=id=>document.getElementById(id),today=new Date();
 $("date").value=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
 const money=n=>Number(n||0).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})+" ج.م";
@@ -79,12 +82,20 @@ function render(){
  const f=$("filter").value,arr=[...tx].filter(x=>f==="all"||x.type===f).sort((a,b)=>b.date.localeCompare(a.date)||b.created_at?.localeCompare(a.created_at));
  $("transactions").innerHTML=arr.length?arr.map(x=>`<div class="item"><div><strong>${esc(x.category)}</strong><small>${x.date} · ${esc(x.note||"بدون ملاحظات")}</small></div><div style="text-align:left;white-space:nowrap"><strong class="${x.type==="income"||x.type==="saving"?"green":"red"}">${x.type==="expense"?"−":"+"}${money(x.amount)}</strong><button class="danger" style="padding:5px 8px;margin-top:5px" onclick="delTx('${String(x.id).replace(/'/g,"")}')">حذف</button></div></div>`).join(""):'<div class="empty">لا توجد حركات مسجلة</div>';
 }
+function renderBars(target,list,type){
+ const sumsBy={};list.filter(x=>x.type===type).forEach(x=>{const k=x.category||"أخرى";sumsBy[k]=(sumsBy[k]||0)+Number(x.amount)});
+ const rows=Object.entries(sumsBy).sort((a,b)=>b[1]-a[1]);const max=rows.length?rows[0][1]:0;
+ $(target).innerHTML=rows.length?rows.map(([name,value])=>`<div class="bar-row"><span>${esc(name)}</span><div class="bar-track"><div class="bar-fill ${type==='income'?'inc':'exp'}" style="width:${max?value/max*100:0}%"></div></div><strong>${money(value)}</strong></div>`).join(''):'<div class="empty">لا توجد بيانات لهذا القسم</div>';
+}
+function renderCharts(){const ym=new Date().toISOString().slice(0,7);const list=$("chartPeriod").value==="all"?tx:tx.filter(x=>x.date.startsWith(ym));renderBars("incomeChart",list,"income");renderBars("expenseChart",list,"expense")}
+function renderWishes(){const arr=[...wishes].sort((a,b)=>b.created_at?.localeCompare(a.created_at));$("wishItems").innerHTML=arr.length?arr.map(w=>`<div class="item"><div><strong>${esc(w.title)}</strong><small>${esc(w.note||"بدون ملاحظات")}</small></div><button class="danger" style="padding:7px 10px" onclick="deleteWish('${String(w.id).replace(/'/g,"\'")}')">حذف</button></div>`).join(''):'<div class="empty">قائمة المشتريات فارغة حالياً</div>'}
+async function loadWishes(){const {data,error}=await db.from("salary_wishlist").select("*").order("created_at",{ascending:false});if(error){msg("wishMsg","تعذر تحميل القائمة: "+error.message,true);return}wishes=data||[];renderWishes()}
 async function loadTx(){
  const {data,error}=await db.from("salary_transactions").select("*").order("date",{ascending:false});
  if(error){msg("saveMsg","تعذر تحميل البيانات: "+error.message,true);return}
- tx=data||[];render();$("cloudBadge").textContent="متصل ومتزامن";
+ tx=data||[];render();renderCharts();$("cloudBadge").textContent="متصل ومتزامن";
 }
-function showApp(user){currentUser=user;$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userLabel").textContent=user.email;$("cloudBadge").textContent="جاري المزامنة";loadTx();if(channel)db.removeChannel(channel);channel=db.channel("salary-sync").on("postgres_changes",{event:"*",schema:"public",table:"salary_transactions",filter:"user_id=eq."+user.id},()=>loadTx()).subscribe();}
+function showApp(user){currentUser=user;$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("userLabel").textContent=user.email;$("cloudBadge").textContent="جاري المزامنة";loadTx();loadWishes();if(channel)db.removeChannel(channel);channel=db.channel("salary-sync").on("postgres_changes",{event:"*",schema:"public",table:"salary_transactions",filter:"user_id=eq."+user.id},()=>loadTx()).on("postgres_changes",{event:"*",schema:"public",table:"salary_wishlist",filter:"user_id=eq."+user.id},()=>loadWishes()).subscribe();}
 async function authAction(kind){
  const email=$("email").value.trim(),password=$("password").value;
  if(!email||password.length<6){msg("authMsg","اكتب البريد الإلكتروني وكلمة مرور من 6 أحرف على الأقل.",true);return}
@@ -105,8 +116,11 @@ $("save").onclick=async()=>{
  tx.unshift(data);render();$("amount").value="";$("note").value="";msg("saveMsg","تم الحفظ والمزامنة. ستظهر الحركة على الجهاز الآخر عند اتصاله بالإنترنت.");
 };
 window.delTx=async id=>{if(!confirm("حذف هذه الحركة من الجهازين؟"))return;const {error}=await db.from("salary_transactions").delete().eq("id",id);if(error){alert("تعذر الحذف: "+error.message);return}tx=tx.filter(x=>x.id!==id);render()};
+$("addWish").onclick=async()=>{const title=$("wishTitle").value.trim();if(!title){msg("wishMsg","اكتب اسم الشيء الذي تريد شراءه.",true);return}$("addWish").disabled=true;const row={id:crypto.randomUUID(),user_id:currentUser.id,title,note:$("wishNote").value.trim()};const {data,error}=await db.from("salary_wishlist").insert(row).select().single();$("addWish").disabled=false;if(error){msg("wishMsg","تعذرت الإضافة: "+error.message,true);return}wishes.unshift(data);renderWishes();$("wishTitle").value="";$("wishNote").value="";msg("wishMsg","تمت الإضافة والمزامنة. لم يتغير رصيدك.")};
+window.deleteWish=async id=>{if(!confirm("حذف هذا العنصر من قائمة المشتريات على الجهازين؟"))return;const {error}=await db.from("salary_wishlist").delete().eq("id",id);if(error){alert("تعذر الحذف: "+error.message);return}wishes=wishes.filter(w=>w.id!==id);renderWishes()};
+$("chartPeriod").onchange=renderCharts;
 $("filter").onchange=render;
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));["add","history","budget"].forEach(id=>$(id).classList.toggle("hidden",id!==b.dataset.tab));if(b.dataset.tab==="history")render()});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));["add","history","budget","wishlist","charts"].forEach(id=>$(id).classList.toggle("hidden",id!==b.dataset.tab));if(b.dataset.tab==="history")render();if(b.dataset.tab==="charts")renderCharts();if(b.dataset.tab==="wishlist")renderWishes()});
 db.auth.getSession().then(({data})=>{if(data.session)showApp(data.session.user)});
 db.auth.onAuthStateChange((event,session)=>{if(session&&!currentUser)showApp(session.user)});
 if("serviceWorker"in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
